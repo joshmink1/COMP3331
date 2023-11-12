@@ -229,7 +229,7 @@ def command_hub(socket):
 
 def UDPSocketRunner(Host, UDPPort):
     clientSocket = socket(AF_INET, SOCK_DGRAM)
-    clientSocket.bind((Host, UDPPort))
+    clientSocket.bind(('127.0.0.1', UDPPort))
     send_checker = threading.Thread(target=UDPSendRunner, args=(clientSocket,))
     send_checker.start()
     while True:
