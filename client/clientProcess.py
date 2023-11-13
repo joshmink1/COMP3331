@@ -12,11 +12,14 @@ from threading import Thread
 import os
 import curses
 import time
+import signal
 import datetime
 
 lock = threading.Lock()
 timeout_id = 0
 p2ptarget = []
+receiving = False
+commandAlive = True
 
 def runClient(Host, TCPPort, UDPPort):
     global timeout_id
@@ -25,40 +28,26 @@ def runClient(Host, TCPPort, UDPPort):
     clientUDPPort = UDPPort
     serverAddress = (serverHost, serverTCPPort)
 
-    UDPThread = threading.Thread(target=UDPSocketRunner, args=(serverHost, clientUDPPort, ))
+    UDPThread = threading.Thread(target=UDPSocketRunner, args=(serverHost, clientUDPPort, ),daemon=True)
     UDPThread.start()
 
-    # define a socket for the client side, it would be used to communicate with the server
     clientSocket = socket(AF_INET, SOCK_STREAM)
-    # build connection with the server and send message to it
     clientSocket.connect(serverAddress)
     hostname=gethostname()
     IPAddr=gethostbyname(hostname)
     print("Your Computer Name is:"+hostname)
-    # print("Your Computer IP Address is:"+ str(clientSocket[0]))
-
-    # Handshake here??
-    # For now, just requesting login
     message = 'login'
     print("[send] " + message)
     clientSocket.send(message.encode())
 
     while True:
-        # message = input("===== Please type any messsage you want to send to server: =====\n")
-        # clientSocket.sendall(message.encode())
-
-        # receive response from the server
-        # 1024 is a suggested packet size, you can specify it as 2048 or others
         try:
             clientSocket.settimeout(2)
             data = clientSocket.recv(1024)
             timeout_id = 0
             receivedMessage = data.decode()
-            # print("DEBUG:" + receivedMessage)
-            # print(receivedMessage)
-            # parse the message received from server and take corresponding actions
+            time.sleep(0.1)
             if receivedMessage == "":
-                # print("[recv] Message from server is empty!")
                 pass
             elif receivedMessage == "user credentials request":
                 print("[recv] You need to provide username and password to login")
@@ -71,21 +60,19 @@ def runClient(Host, TCPPort, UDPPort):
                 credentials_password(clientSocket)
             elif receivedMessage == "authentication complete":
                 print("[recv] Authentication complete! You are successfully logged in as '"+ username +"'")
-                commandThread = threading.Thread(target=command_hub, args=(clientSocket,))
+                commandThread = threading.Thread(target=command_hub, args=(clientSocket,), daemon=True)
                 commandThread.start()
                 message = 'user udp port:' + str(clientUDPPort)
                 clientSocket.send(message.encode())
             elif receivedMessage == "download filename":
                 print("[recv] You need to provide the file name you want to download")
-            # Handle wrong password case
-            # What happens after the timeout runs out, password prompt again?
             elif receivedMessage == 'logout successful':
                 print('You have been logged out successfully. We hope to see you soon!')
                 clientSocket.shutdown(SHUT_RDWR)
                 clientSocket.close()
                 sys.exit()
+                # os.kill(os.getpid(), signal.SIGINT)
             elif receivedMessage.startswith('p2p request'):
-                print('nigga')
                 splitted = receivedMessage.split(':')
                 lock.acquire()
                 p2ptarget.append(str(splitted[1]))
@@ -120,9 +107,12 @@ def runClient(Host, TCPPort, UDPPort):
                 print("\n[recv] Private message from " + "\033[1;37;42m" + receivedMessage.split(":")[2] + "\033[0m" + ' (' + str(datetime.datetime.now()) + ')'+': ' + receivedMessage.split(":")[1] + '\n(' + "\033[1;37;42m"  +username + "\033[0m" + ') ', end="")
                 message = 'message received:' + receivedMessage.split(":")[2]
                 clientSocket.send(message.encode())
+
             elif receivedMessage.startswith("activeuserlist"):
                 users = receivedMessage.split('%')
                 counter = 0
+                time.sleep(0.05)
+                print('\n== ACTIVE USERS')
                 for user in users[1:]:
                     if not user.startswith("username: " + username):
                         counter += 1
@@ -175,7 +165,7 @@ def continue_prompt():
 def command_hub(socket):
     global timeout_id
     flag = False
-    commandAlive = True
+    global commandAlive
     while commandAlive:
         # os.system('cls' if os.name == 'nt' else 'clear')
         print("Please enter one of the following commands:")
@@ -189,7 +179,7 @@ def command_hub(socket):
         if (flag == True):
             print("Please ensure the command entered is correct")
             flag = False
-        time.sleep(0.2)
+        time.sleep(0.35)
         command = input("(" + "\033[1;37;42m" +username + "\033[0m" + ") ")
         cmdArgs = command.strip().split(' ')
         if (cmdArgs[0] == '/msgto' and len(cmdArgs) >= 3):
@@ -221,52 +211,106 @@ def command_hub(socket):
         elif (cmdArgs[0] == '/p2pvideo' and len(cmdArgs) == 3):
             # Only checking if user is active and get their Address and UDP Port from server
             message = 'p2pcheck:' +  cmdArgs[1]
+            lock.acquire()
             p2ptarget.append(cmdArgs[2])
+            lock.release()
             socket.send(message.encode())
         else:
             flag = True
 
 
+
 def UDPSocketRunner(Host, UDPPort):
+    global receiving
     clientSocket = socket(AF_INET, SOCK_DGRAM)
     clientSocket.bind(('127.0.0.1', UDPPort))
-    send_checker = threading.Thread(target=UDPSendRunner, args=(clientSocket,))
+    send_checker = threading.Thread(target=UDPSendRunner, args=(clientSocket,),daemon=True)
     send_checker.start()
-    while True:
-        filename, clientAddress = clientSocket.recvfrom(1024)
-        print("file starting to receive: " + filename.decode())
-        f = open('received_' + filename.decode(), 'wb')
-        data, addr = clientSocket.recvfrom(1024)
+    received = 0
+    buf = 8192
+    queue = []
+    while commandAlive == True:
+        # clientSocket.listen()
+        # clientSocket, clientAddress = clientSocket.accept()
+        header, clientAddress = clientSocket.recvfrom(buf)
+        decoded_header = header.decode('latin-1')
+        filename = decoded_header.split(':')[0]
+        filesize = int(decoded_header.split(':')[1])
+        sending_user = decoded_header.split(':')[2]
+        print("== Receiving file from " + sending_user + ': ' + filename + ' (size: ' + str(filesize) + ' bytes)')
+        clientSocket.settimeout(0.5)
+        lock.acquire()
+        receiving = True
+        lock.release()
+        f = open('received_' + filename, 'wb')
+        data, addr = clientSocket.recvfrom(buf)
+        lock.acquire()
+        queue.append(data)
+        lock.release()
+        counter = 0
+        queuethread = threading.Thread(target=queueManager, args=(filename, queue, f), daemon=True)
+        queuethread.start()
         while(data != ''):
-            print(data.decode())
-            f.write(data)
-            clientSocket.settimeout(0.5)
+            # print(data.decode('latin-1'))                
+            if (received / filesize > counter):
+                    # print('yoo: ' + str(received/filesize) + 'b' + str(filesize))
+                    print(str(int(counter * 100)) + '% Received')
+                    counter += 0.1
+            received += buf
             try:
-                data, addr = clientSocket.recvfrom(1024)
+                data, addr = clientSocket.recvfrom(buf)
+                # lock.acquire()
+                queue.append(data)
+                # lock.release()
             except timeout as e:
                 print('downloaded')
                 break
+        lock.acquire()
+        receiving = False
+        lock.release()
         f.close()
+        received = 0
         clientSocket.settimeout(None)
+
+
+def queueManager(filename, queue, file):
+    # Constantly monitor queue while actively receiving or while queue is not empty
+    while (len(queue) != 0 or receiving == True) and commandAlive == True:
+        # print('queue:' + str(len(queue)) + ': ' + str(receiving))# end='')
+        if len(queue) != 0:
+            lock.acquire()
+            file.write(queue.pop(0))
+            lock.release()
+
 
 def UDPSendRunner(socket):
     global p2ptarget
-    while True:
-        buf = 1024
+    while commandAlive == True:
+        buf = 8192
         lock.acquire()
         senderUpdate = p2ptarget
         lock.release()
-        if (senderUpdate != []):
-            print('sht')
-            for l in p2ptarget:
-                print("baba: " + l)
+        if (len(senderUpdate) > 1):
+            time.sleep(0.5)
+            print('\n== SENDING FILE')
+            print('== PLEASE DO NOT ENTER COMMANDS UNTIL SENDING IS COMPLETE')
             address = (senderUpdate[1], int(senderUpdate[2]))
-            print('INFO:' + str(address))
-            socket.sendto(senderUpdate[0].encode(), address)
+            socket.connect(address)
+            filesize = os.path.getsize(senderUpdate[0])
+            message = senderUpdate[0] + ':' + str(filesize) + ':' + username
+            socket.sendto(message.encode('latin-1'), address)
             file = open(senderUpdate[0], "rb")
             data = file.read(buf)
-            while(data.decode() != ''):
-                print(data)
+            sent = 0
+            counter = 0
+            socket.settimeout(1)
+            while(data.decode('latin-1') != ''):
+                if (sent / filesize > counter):
+                    print(str(int(counter * 100)) + '% Sent')
+                    counter += 0.1
                 socket.sendto(data, address)
+                time.sleep(0.01)
                 data = file.read(buf)
+                sent += buf
+            print('File successfully sent' + '\n(' + "\033[1;37;42m"  +username + "\033[0m" + ') ', end="")
             p2ptarget = []
