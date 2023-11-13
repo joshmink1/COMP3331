@@ -149,7 +149,6 @@ class ClientThread(Thread):
                     self.clientSocket.send(sendMessage.encode())
                     invalidFlag = True
                 for user in args[2:]:
-                    # print("WAP:" + user)
                     if not self.checkUserValid(user):
                         self.clientSocket.send('receiver unavaliable'.encode())
                         invalidFlag = True
@@ -172,7 +171,6 @@ class ClientThread(Thread):
                     self.clientSocket.send(sendMessage.encode())
                     flag = False
                 groupStatus = self.checkUserInGroup(args[1])
-                print('bunny 2')
                 # print("beeboo:" + groupStatus)
                 if groupStatus == -1 and flag == True:
                     self.clientSocket.send('no group invite'.encode())
@@ -180,15 +178,12 @@ class ClientThread(Thread):
                     messagesend = 'not joined group:' + args[1]
                     self.clientSocket.send(messagesend.encode())
                 elif groupStatus == 1 and flag == True:
-                    print('bunny 3')
                     templogger = logger.setupLogger('messagelogger', args[1] + '_messagelog.txt')
                     templogger.info(self.groupMessageFormat(args))
                     templogger.handlers.clear()
-                    print('bunny 4')
                     self.clientSocket.send('group msg sent'.encode())
                     # lock.acquire()
                     users = self.getUsersInGroup(args[1])
-                    print('bunny 5')
                     for user in users:
                         print(user)
                         if user != self.username:
@@ -196,7 +191,6 @@ class ClientThread(Thread):
                             for arg in args[2:]:
                                 messagesend = messagesend + arg + ' ' 
                             self.socketFinder(user).send(messagesend.encode())
-                    print('bunny 6')
                     # lock.release()
 
             # Logout
@@ -393,7 +387,6 @@ class ClientThread(Thread):
 
     def joinGroup(self, groupname):
         lock.acquire()
-        seekcurr = 0
         flag = False
         with open('groupchat.txt', 'r') as fr:
             lines = fr.readlines()
@@ -479,6 +472,7 @@ class ClientThread(Thread):
             for line in f:
                 userlog = line.strip().split('; ')
                 if userlog[2] == user: 
+                    print('cc:' + userlog[2] + userlog[3] + userlog[4])
                     string = userlog[3] + ':' + userlog[4]
         lock.release()
         return string

@@ -1,5 +1,0 @@
-1; 2023-11-12 13:24:12.843324; josh; hey
-2; 2023-11-12 13:24:19.159602; dave; whats up
-3; 2023-11-12 13:24:25.644573; john; nothing much
-4; 2023-11-12 13:24:45.244378; john; im chillilng
-5; 2023-11-12 13:25:39.678882; josh; whos down for bowling
