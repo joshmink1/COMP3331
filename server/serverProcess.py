@@ -6,7 +6,6 @@ import threading
 import authenticate
 import logger
 import time
-# from clientClass import ClientThread
 
 lock = threading.Lock()
 
@@ -171,7 +170,6 @@ class ClientThread(Thread):
                     self.clientSocket.send(sendMessage.encode())
                     flag = False
                 groupStatus = self.checkUserInGroup(args[1])
-                # print("beeboo:" + groupStatus)
                 if groupStatus == -1 and flag == True:
                     self.clientSocket.send('no group invite'.encode())
                 elif groupStatus == 0 and flag == True:
@@ -182,16 +180,13 @@ class ClientThread(Thread):
                     templogger.info(self.groupMessageFormat(args))
                     templogger.handlers.clear()
                     self.clientSocket.send('group msg sent'.encode())
-                    # lock.acquire()
                     users = self.getUsersInGroup(args[1])
                     for user in users:
-                        print(user)
                         if user != self.username:
                             messagesend = 'groupmsg:' + args[1] + ':' + str(self.username) + ':'
                             for arg in args[2:]:
                                 messagesend = messagesend + arg + ' ' 
                             self.socketFinder(user).send(messagesend.encode())
-                    # lock.release()
 
             # Logout
 
@@ -208,7 +203,6 @@ class ClientThread(Thread):
                 splitted = message.split(':')
                 if self.checkOnline(splitted[1]):
                     message = 'p2p request:' + self.getUserInfo(splitted[1])
-                    print('quiff' + message)
                     self.clientSocket.send(message.encode())
                 else:
                     message = 'receiver unavaliable'
@@ -252,19 +246,15 @@ class ClientThread(Thread):
 
     def process_password(self, password):
         try:
-            print("buckets")
             if (self.is_blocked()):
-                print("buckets")
                 lock.acquire()
                 message = 'timed out for ' + str(int(10 - (time.time() - start))) + ' seconds for too many incorrect attempts'
                 lock.release()
                 self.clientSocket.send(message.encode())
                 return
-            print("buckets")
             authenticate.verify_pass(self.usernameattempt, password)
             message = 'authentication complete'
             self.username = self.usernameattempt
-            print("buckets")
             print(str(self.clientAddress) + ':{' + self.username + '}' + " [send] User '" + self.username + "'(" + str(self.clientAddress) + ") has been sucessfully authenticated")
             self.clientSocket.send(message.encode())
             self.authenticated == True
@@ -280,16 +270,9 @@ class ClientThread(Thread):
                 self.clientSocket.send(message.encode())
     
     def is_blocked(self):
-        print("bunnies")
-        # lock.acquire()
-        print("bunnies")
         for i in blocked:
-            print("oogabooga: " + i)
-            print("oogabooga: " + self.username)
             if self.username == i:
-                # lock.release()
                 return True
-        # lock.release()
         return False
 
     def userLogFormat(self, UDPPort):
@@ -355,7 +338,6 @@ class ClientThread(Thread):
         with open('userlog.txt', 'r') as f:
             for line in f:
                 loguser = line.split('; ')
-                # print("ioyaaa:" + str(loguser[2]) + ':' + str(user))
                 if loguser[2] == user:
                     lock.release()
                     return True
@@ -364,13 +346,9 @@ class ClientThread(Thread):
     
     def createGroup(self, args):
         lock.acquire()
-        # print('wappin:' + args[0] + ' ' + args[1] + ' ' + args[2])
         usernames = args[2:]
         # Assuming creator of the group does not have to join his own group
         usernames.insert(0, self.username)
-        # print('ayo:' + self.username)
-        # for arg in usernames:
-            # print("shheedh:" + arg)
         groupchatLogger.info(self.groupchatLogFormat(usernames, args[1], len(usernames)))
         file = open(args[1] + '_messagelog.txt', 'w')
         file.close()
@@ -409,7 +387,6 @@ class ClientThread(Thread):
         users = line.strip().split(' ')
         linelist = list(line)
         for user in users:
-            # print('booga:'+user+';'+self.username)
             if (user == self.username):
                 checkFlag = True
                 break
@@ -472,7 +449,6 @@ class ClientThread(Thread):
             for line in f:
                 userlog = line.strip().split('; ')
                 if userlog[2] == user: 
-                    print('cc:' + userlog[2] + userlog[3] + userlog[4])
                     string = userlog[3] + ':' + userlog[4]
         lock.release()
         return string

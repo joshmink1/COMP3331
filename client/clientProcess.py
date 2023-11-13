@@ -242,7 +242,7 @@ def UDPSocketRunner(Host, UDPPort):
         lock.acquire()
         receiving = True
         lock.release()
-        f = open('received_' + filename, 'wb')
+        f = open(sending_user + '_' + filename, 'wb')
         data, addr = clientSocket.recvfrom(buf)
         lock.acquire()
         queue.append(data)
