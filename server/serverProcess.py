@@ -166,7 +166,6 @@ class ClientThread(Thread):
 
             elif message.startswith('group message'):
                 args = message.split(':')
-                print('bunny 1')
                 flag = True
                 if not self.checkGroupexists(args[1]):
                     sendMessage = 'group does not exist'
